@@ -1,5 +1,7 @@
 # Nicolò Castellini — Personal website
 
+https://castellininicolo.github.io/Nico/
+
 A responsive personal biography and portfolio landing page built with Next.js,
 vinext, and Framer Motion.
 
