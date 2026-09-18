@@ -14,6 +14,7 @@ import {
   type MotionValue,
 } from "framer-motion";
 import {
+  type FormEvent as ReactFormEvent,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -28,6 +29,7 @@ const focusAreas = [
     description:
       "Trasformo un’intuizione in un’esperienza chiara, utile e piacevole da usare.",
     shape: "product",
+    calibration: { start: -68, target: 16, label: "orbita prodotto" },
   },
   {
     number: "02",
@@ -35,6 +37,7 @@ const focusAreas = [
     description:
       "Costruisco soluzioni solide, curate nei dettagli e pensate per evolvere.",
     shape: "software",
+    calibration: { start: 62, target: -12, label: "architettura software" },
   },
   {
     number: "03",
@@ -42,6 +45,7 @@ const focusAreas = [
     description:
       "Esploro nuovi modi di semplificare il lavoro e amplificare le idee.",
     shape: "automation",
+    calibration: { start: -54, target: 24, label: "rete automatizzata" },
   },
 ] as const;
 
@@ -63,6 +67,7 @@ const loadMotionFeatures = () =>
   import("./motion-features").then((module) => module.default);
 
 type FocusArea = (typeof focusAreas)[number];
+type CalibrationStatus = "ready" | "near" | "solved";
 
 function HeroComposition({
   progress,
@@ -100,21 +105,21 @@ function HeroComposition({
   const coralColor = useTransform(
     progress,
     [0, 0.34, 0.7, 1],
-    ["#ff664f", "#d8ff3e", "#3157ff", "#f2efe8"],
+    ["#761b38", "#c47b92", "#3d0b1c", "#f4f2ef"],
   );
   const blueRotate = useTransform(progress, [0, 1], [0, -168]);
   const blueScale = useTransform(progress, [0, 0.58, 1], [1, 1.12, 0.66]);
   const blueColor = useTransform(
     progress,
     [0, 0.38, 0.74, 1],
-    ["#3157ff", "#ff664f", "#d8ff3e", "#3157ff"],
+    ["#3d0b1c", "#761b38", "#ffffff", "#3d0b1c"],
   );
   const acidRotate = useTransform(progress, [0, 1], [-18, 238]);
   const acidScale = useTransform(progress, [0, 0.48, 1], [0.78, 1.14, 0.72]);
   const acidColor = useTransform(
     progress,
     [0, 0.5, 1],
-    ["#d8ff3e", "#3157ff", "#ff664f"],
+    ["#ffffff", "#c47b92", "#761b38"],
   );
   const paperRotate = useTransform(progress, [0, 1], [24, -124]);
   const paperScale = useTransform(progress, [0, 0.55, 1], [0.86, 1.08, 0.7]);
@@ -211,9 +216,9 @@ function HeroComposition({
         <span className="hero-shape-body" />
       </m.span>
       <div className="hero-reactor-status" aria-live="polite">
-        <span>IDEA REACTOR / 01</span>
-        <strong>{isComplete ? "Composizione attiva" : `${activeCount}/3 segnali`}</strong>
-        <small>{isComplete ? "Strategia, tecnologia e design allineati." : "Seleziona le forme."}</small>
+        <span>COMPOSITION SYSTEM / 01</span>
+        <strong>{isComplete ? "Sistema calibrato" : `${activeCount}/3 livelli`}</strong>
+        <small>{isComplete ? "Strategia, tecnologia e design allineati." : "Attiva i tre livelli."}</small>
       </div>
     </div>
   );
@@ -224,16 +229,37 @@ function FocusVisual({
   index,
   progress,
   isActive,
-  isEngaged,
   shouldReduceMotion,
 }: {
   area: FocusArea;
   index: number;
   progress: MotionValue<number>;
   isActive: boolean;
-  isEngaged: boolean;
   shouldReduceMotion: boolean;
 }) {
+  const [calibrationStatus, setCalibrationStatus] =
+    useState<CalibrationStatus>("ready");
+  const [hasCalibrated, setHasCalibrated] = useState(false);
+  const [isInspecting, setIsInspecting] = useState(false);
+  const calibrationStatusRef = useRef<CalibrationStatus>("ready");
+  const calibrationInputRef = useRef<HTMLInputElement>(null);
+  const visualBounds = useRef<DOMRect | null>(null);
+  const inspectionPointerX = useMotionValue(0);
+  const inspectionPointerY = useMotionValue(0);
+  const calibration = useMotionValue<number>(area.calibration.start);
+  const smoothInspectionX = useSpring(inspectionPointerX, {
+    stiffness: 240,
+    damping: 30,
+  });
+  const smoothInspectionY = useSpring(inspectionPointerY, {
+    stiffness: 240,
+    damping: 30,
+  });
+  const smoothCalibration = useSpring(calibration, {
+    stiffness: 260,
+    damping: 28,
+    mass: 0.3,
+  });
   const stageRotate = useTransform(
     progress,
     [0, 0.38, 0.72, 1],
@@ -276,15 +302,148 @@ function FocusVisual({
     [0, 0.28, 0.58, 0.82, 1],
     [0.2, 1, 0.62, 1.18, 0.82],
   );
-  const isMoving = isActive && !shouldReduceMotion;
+  const inspectionX = useTransform(smoothInspectionX, [-0.5, 0.5], [-10, 10]);
+  const inspectionY = useTransform(smoothInspectionY, [-0.5, 0.5], [-8, 8]);
+  const inspectionRotate = useTransform(
+    smoothInspectionX,
+    [-0.5, 0.5],
+    [-2.4, 2.4],
+  );
+  const calibrationDelta = useTransform(
+    smoothCalibration,
+    (value) => value - area.calibration.target,
+  );
+  const calibrationTravel = index === 1 ? 26 : index === 0 ? 18 : 13;
+  const calibrationRotation = index === 1 ? 8 : index === 0 ? 28 : 20;
+  const calibrationX = useTransform(
+    calibrationDelta,
+    [-120, 0, 120],
+    [-calibrationTravel, 0, calibrationTravel],
+    { clamp: true },
+  );
+  const calibrationY = useTransform(
+    calibrationDelta,
+    [-120, 0, 120],
+    [8, 0, -8],
+    { clamp: true },
+  );
+  const calibrationRotate = useTransform(
+    calibrationDelta,
+    [-120, 0, 120],
+    [-calibrationRotation, 0, calibrationRotation],
+    { clamp: true },
+  );
+  const calibrationScale = useTransform(
+    calibrationDelta,
+    [-120, 0, 120],
+    [0.9, 1, 0.9],
+    { clamp: true },
+  );
+  const isMoving =
+    isActive &&
+    !isInspecting &&
+    calibrationStatus !== "solved" &&
+    !shouldReduceMotion;
+  const instructionId = `focus-calibration-instructions-${index}`;
+  const statusId = `focus-calibration-status-${index}`;
+  const targetPosition = ((area.calibration.target + 100) / 200) * 100;
+  const statusLabel =
+    calibrationStatus === "solved"
+      ? "LOCKED"
+      : calibrationStatus === "near"
+        ? "FINE TUNE"
+        : "CALIBRATE";
+  const statusCopy =
+    calibrationStatus === "solved"
+      ? "Sistema calibrato"
+      : calibrationStatus === "near"
+        ? "Assetto vicino"
+        : "Regola il segnale";
+
+  const updateCalibrationStatus = (nextStatus: CalibrationStatus) => {
+    if (calibrationStatusRef.current === nextStatus) return;
+    calibrationStatusRef.current = nextStatus;
+    setCalibrationStatus(nextStatus);
+  };
+
+  const handleCalibrationInput = (event: ReactFormEvent<HTMLInputElement>) => {
+    if (calibrationStatusRef.current === "solved") {
+      event.currentTarget.value = String(area.calibration.target);
+      calibration.set(area.calibration.target);
+      return;
+    }
+
+    const value = event.currentTarget.valueAsNumber;
+    const distance = Math.abs(value - area.calibration.target);
+    setHasCalibrated(true);
+
+    if (distance <= 7) {
+      event.currentTarget.value = String(area.calibration.target);
+      calibration.set(area.calibration.target);
+      updateCalibrationStatus("solved");
+      return;
+    }
+
+    calibration.set(value);
+    updateCalibrationStatus(distance <= 26 ? "near" : "ready");
+  };
+
+  const resetCalibration = () => {
+    if (calibrationInputRef.current) {
+      calibrationInputRef.current.value = String(area.calibration.start);
+    }
+    calibration.set(area.calibration.start);
+    calibrationStatusRef.current = "ready";
+    setCalibrationStatus("ready");
+    setHasCalibrated(false);
+    calibrationInputRef.current?.focus();
+  };
+
+  const handleVisualPointerEnter = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (event.pointerType !== "mouse") return;
+    visualBounds.current = event.currentTarget.getBoundingClientRect();
+    setIsInspecting(true);
+  };
+
+  const handleVisualPointerMove = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (event.pointerType !== "mouse" || shouldReduceMotion) return;
+    const bounds = visualBounds.current;
+    if (!bounds) return;
+    inspectionPointerX.set((event.clientX - bounds.left) / bounds.width - 0.5);
+    inspectionPointerY.set((event.clientY - bounds.top) / bounds.height - 0.5);
+  };
+
+  const handleVisualPointerLeave = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    visualBounds.current = null;
+    inspectionPointerX.set(0);
+    inspectionPointerY.set(0);
+    if (!event.currentTarget.contains(document.activeElement)) {
+      setIsInspecting(false);
+    }
+  };
 
   return (
     <div
-      className={`shape shape-${area.shape}${isEngaged ? " is-engaged" : ""}`}
-      aria-hidden="true"
+      className={`shape shape-${area.shape} shape-${calibrationStatus}${isInspecting ? " is-inspecting" : ""}`}
+      onPointerEnter={handleVisualPointerEnter}
+      onPointerMove={handleVisualPointerMove}
+      onPointerLeave={handleVisualPointerLeave}
+      onFocusCapture={() => setIsInspecting(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setIsInspecting(false);
+        }
+      }}
     >
       <m.div
         className="shape-stage"
+        aria-hidden="true"
         style={
           shouldReduceMotion
             ? undefined
@@ -292,158 +451,247 @@ function FocusVisual({
         }
       >
         <m.div
-          className="shape-live"
-          animate={
-            isMoving
-              ? {
-                  y: [0, isEngaged ? -15 : -9, 0],
-                  rotate: [0, index === 1 ? (isEngaged ? -6 : -2) : isEngaged ? 7 : 3, 0],
-                  scale: isEngaged ? [1, 1.055, 1] : 1,
-                }
-              : { y: 0, rotate: 0, scale: 1 }
+          className="shape-inspection"
+          style={
+            shouldReduceMotion
+              ? undefined
+              : { x: inspectionX, y: inspectionY, rotate: inspectionRotate }
           }
-          transition={{
-            duration: 5.8 + index * 0.8,
-            ease: "easeInOut",
-            repeat: isMoving ? Infinity : 0,
-          }}
         >
-          {area.shape === "product" && (
-            <>
-              <m.span
-                className="product-orbit"
-                style={
-                  shouldReduceMotion
-                    ? undefined
-                    : { rotate: orbitRotate, scale: orbitScale }
-                }
-              >
-                <m.span
-                  className="product-orbit-live"
-                  animate={isMoving ? { rotate: [0, 360] } : { rotate: 0 }}
-                  transition={{
-                    duration: 8,
-                    ease: "linear",
-                    repeat: isMoving ? Infinity : 0,
-                  }}
-                >
-                  <span className="product-satellite product-satellite-a" />
-                  <span className="product-satellite product-satellite-b" />
-                </m.span>
-              </m.span>
-              <m.span
-                className="product-core"
-                style={
-                  shouldReduceMotion
-                    ? undefined
-                    : { rotate: counterRotate, scale: orbitScale }
-                }
-              />
-              <m.span
-                className="product-cardlet"
-                style={
-                  shouldReduceMotion
-                    ? undefined
-                    : { x: satelliteX, y: satelliteY, rotate: orbitRotate }
-                }
-              />
-            </>
-          )}
-
-          {area.shape === "software" && (
-            <>
-              <m.span
-                className="software-panel software-panel-a"
-                style={
-                  shouldReduceMotion
-                    ? undefined
-                    : { x: panelAX, y: panelAY, rotate: panelARotate }
-                }
-              />
-              <m.span
-                className="software-panel software-panel-b"
-                style={
-                  shouldReduceMotion
-                    ? undefined
-                    : { x: panelBX, y: panelBY, rotate: panelBRotate }
-                }
-              />
-              <m.span
-                className="software-panel software-panel-main"
-                style={
-                  shouldReduceMotion
-                    ? undefined
-                    : { rotate: counterRotate, scale: orbitScale }
-                }
-              >
-                <i />
-                <i />
-                <i />
-                <strong>&lt;/&gt;</strong>
-              </m.span>
-              <m.span
-                className="software-scanner"
-                animate={
-                  isMoving
-                    ? { x: ["-150%", "150%"], opacity: [0, 0.85, 0] }
-                    : { x: "-150%", opacity: 0 }
-                }
-                transition={{
-                  duration: 4.8,
-                  ease: "easeInOut",
-                  repeat: isMoving ? Infinity : 0,
-                }}
-              />
-            </>
-          )}
-
-          {area.shape === "automation" && (
+          <m.div
+            className="shape-calibration"
+            style={
+              shouldReduceMotion
+                ? undefined
+                : {
+                    x: calibrationX,
+                    y: calibrationY,
+                    rotate: calibrationRotate,
+                    scale: calibrationScale,
+                  }
+            }
+          >
             <m.div
-              className="automation-system"
-              style={
-                shouldReduceMotion
-                  ? undefined
-                  : { rotate: networkRotate, scale: networkScale }
+              className="shape-live"
+              animate={
+                isMoving
+                  ? {
+                      y: [0, -9, 0],
+                      rotate: [0, index === 1 ? -2 : 3, 0],
+                    }
+                  : { y: 0, rotate: 0 }
+              }
+              transition={
+                isMoving
+                  ? {
+                      duration: 5.8 + index * 0.8,
+                      ease: "easeInOut",
+                      repeat: Infinity,
+                    }
+                  : { duration: 0.42, ease: "easeOut" }
               }
             >
-              <m.div
-                className="automation-live"
-                animate={isMoving ? { rotate: [0, 360] } : { rotate: 0 }}
-                transition={{
-                  duration: 9,
-                  ease: "linear",
-                  repeat: isMoving ? Infinity : 0,
-                }}
-              >
-                <span className="automation-line automation-line-a" />
-                <span className="automation-line automation-line-b" />
-                <span className="automation-line automation-line-c" />
-                <m.span
-                  className="automation-node automation-node-a"
-                  style={shouldReduceMotion ? undefined : { scale: nodeScale }}
-                />
-                <m.span
-                  className="automation-node automation-node-b"
-                  style={shouldReduceMotion ? undefined : { scale: nodeScale }}
-                />
-                <m.span
-                  className="automation-node automation-node-c"
-                  style={shouldReduceMotion ? undefined : { scale: nodeScale }}
-                />
-              </m.div>
-              <m.span
-                className="automation-core"
-                style={
-                  shouldReduceMotion
-                    ? undefined
-                    : { rotate: counterRotate, scale: nodeScale }
-                }
-              />
+              {area.shape === "product" && (
+                <>
+                  <m.span
+                    className="product-orbit"
+                    style={
+                      shouldReduceMotion
+                        ? undefined
+                        : { rotate: orbitRotate, scale: orbitScale }
+                    }
+                  >
+                    <m.span
+                      className="product-orbit-live"
+                      animate={isMoving ? { rotate: [0, 360] } : { rotate: 0 }}
+                      transition={
+                        isMoving
+                          ? { duration: 8, ease: "linear", repeat: Infinity }
+                          : { duration: 0.45, ease: "easeOut" }
+                      }
+                    >
+                      <span className="product-satellite product-satellite-a" />
+                      <span className="product-satellite product-satellite-b" />
+                    </m.span>
+                  </m.span>
+                  <m.span
+                    className="product-core"
+                    style={
+                      shouldReduceMotion
+                        ? undefined
+                        : { rotate: counterRotate, scale: orbitScale }
+                    }
+                  />
+                  <m.span
+                    className="product-cardlet"
+                    style={
+                      shouldReduceMotion
+                        ? undefined
+                        : { x: satelliteX, y: satelliteY, rotate: orbitRotate }
+                    }
+                  />
+                </>
+              )}
+
+              {area.shape === "software" && (
+                <>
+                  <m.span
+                    className="software-panel software-panel-a"
+                    style={
+                      shouldReduceMotion
+                        ? undefined
+                        : { x: panelAX, y: panelAY, rotate: panelARotate }
+                    }
+                  />
+                  <m.span
+                    className="software-panel software-panel-b"
+                    style={
+                      shouldReduceMotion
+                        ? undefined
+                        : { x: panelBX, y: panelBY, rotate: panelBRotate }
+                    }
+                  />
+                  <m.span
+                    className="software-panel software-panel-main"
+                    style={
+                      shouldReduceMotion
+                        ? undefined
+                        : { rotate: counterRotate, scale: orbitScale }
+                    }
+                  >
+                    <i />
+                    <i />
+                    <i />
+                    <strong>&lt;/&gt;</strong>
+                  </m.span>
+                  <m.span
+                    className="software-scanner"
+                    animate={
+                      isMoving
+                        ? { x: ["-150%", "150%"], opacity: [0, 0.85, 0] }
+                        : {
+                            x: isInspecting ? "0%" : "-150%",
+                            opacity: isInspecting ? 0.52 : 0,
+                          }
+                    }
+                    transition={
+                      isMoving
+                        ? { duration: 4.8, ease: "easeInOut", repeat: Infinity }
+                        : { duration: 0.35, ease: "easeOut" }
+                    }
+                  />
+                </>
+              )}
+
+              {area.shape === "automation" && (
+                <m.div
+                  className="automation-system"
+                  style={
+                    shouldReduceMotion
+                      ? undefined
+                      : { rotate: networkRotate, scale: networkScale }
+                  }
+                >
+                  <m.div
+                    className="automation-live"
+                    animate={isMoving ? { rotate: [0, 360] } : { rotate: 0 }}
+                    transition={
+                      isMoving
+                        ? { duration: 9, ease: "linear", repeat: Infinity }
+                        : { duration: 0.45, ease: "easeOut" }
+                    }
+                  >
+                    <span className="automation-line automation-line-a" />
+                    <span className="automation-line automation-line-b" />
+                    <span className="automation-line automation-line-c" />
+                    <m.span
+                      className="automation-node automation-node-a"
+                      style={shouldReduceMotion ? undefined : { scale: nodeScale }}
+                    />
+                    <m.span
+                      className="automation-node automation-node-b"
+                      style={shouldReduceMotion ? undefined : { scale: nodeScale }}
+                    />
+                    <m.span
+                      className="automation-node automation-node-c"
+                      style={shouldReduceMotion ? undefined : { scale: nodeScale }}
+                    />
+                  </m.div>
+                  <m.span
+                    className="automation-core"
+                    style={
+                      shouldReduceMotion
+                        ? undefined
+                        : { rotate: counterRotate, scale: nodeScale }
+                    }
+                  />
+                </m.div>
+              )}
             </m.div>
-          )}
+          </m.div>
         </m.div>
       </m.div>
-      <span className="shape-coordinate">0{index + 1} / 03</span>
+      <span className="shape-coordinate" aria-hidden="true">
+        0{index + 1} / 03
+      </span>
+      <div className="focus-calibration">
+        <div className="focus-calibration-status">
+          <span>{statusLabel}</span>
+          <output id={statusId} aria-live="polite">
+            {statusCopy}
+          </output>
+          <button
+            type="button"
+            className="focus-calibration-reset"
+            aria-label={`Reimposta calibrazione: ${area.title}`}
+            disabled={!hasCalibrated}
+            onClick={resetCalibration}
+          >
+            <span aria-hidden="true">↺</span>
+          </button>
+        </div>
+        <label className="focus-calibration-control">
+          <span className="sr-only">Calibra {area.calibration.label}</span>
+          <input
+            ref={calibrationInputRef}
+            type="range"
+            min="-100"
+            max="100"
+            step="1"
+            defaultValue={area.calibration.start}
+            aria-describedby={`${instructionId} ${statusId}`}
+            aria-disabled={calibrationStatus === "solved"}
+            aria-valuetext={statusCopy}
+            onInput={handleCalibrationInput}
+            onKeyDown={(event) => {
+              if (
+                calibrationStatusRef.current === "solved" &&
+                [
+                  "ArrowLeft",
+                  "ArrowRight",
+                  "ArrowUp",
+                  "ArrowDown",
+                  "Home",
+                  "End",
+                  "PageUp",
+                  "PageDown",
+                ].includes(event.key)
+              ) {
+                event.preventDefault();
+              }
+            }}
+          />
+          <span
+            className="focus-calibration-target"
+            aria-hidden="true"
+            style={{ left: `${targetPosition}%` }}
+          />
+        </label>
+        <p id={instructionId} className="sr-only">
+          Trascina o clicca la scala. Da tastiera usa le frecce per raggiungere
+          il punto di calibrazione.
+        </p>
+      </div>
     </div>
   );
 }
@@ -496,7 +744,7 @@ function ScrollJourney({
   const ballColor = useTransform(
     progress,
     [0, 0.24, 0.49, 0.73, 1],
-    ["#d8ff3e", "#ff664f", "#f2efe8", "#3157ff", "#11100f"],
+    ["#c47b92", "#761b38", "#f4f2ef", "#3d0b1c", "#0b0b0d"],
   );
   const journeyOpacity = useTransform(progress, [0, 0.96, 1], [1, 1, 0]);
   const targetStretch = useTransform(
@@ -710,7 +958,6 @@ function FocusCard({
   index: number;
   shouldReduceMotion: boolean;
 }) {
-  const [isEngaged, setIsEngaged] = useState(false);
   const cardRef = useRef<HTMLElement>(null);
   const cardBounds = useRef<DOMRect | null>(null);
   const isInView = useInView(cardRef, { margin: "-8% 0px -8% 0px" });
@@ -747,6 +994,11 @@ function FocusCard({
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLElement>) => {
     if (event.pointerType !== "mouse" || shouldReduceMotion) return;
+    if ((event.target as HTMLElement).closest(".focus-calibration")) {
+      tiltX.set(0);
+      tiltY.set(0);
+      return;
+    }
     const bounds = cardBounds.current;
     if (!bounds) return;
 
@@ -767,7 +1019,7 @@ function FocusCard({
   return (
     <m.article
       ref={cardRef}
-      className={`focus-card${isEngaged ? " is-engaged" : ""}`}
+      className="focus-card"
       onPointerEnter={handlePointerEnter}
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
@@ -788,23 +1040,12 @@ function FocusCard({
         index={index}
         progress={smoothCardProgress}
         isActive={isInView}
-        isEngaged={isEngaged}
         shouldReduceMotion={shouldReduceMotion}
       />
       <div className="focus-meta">
         <span>{area.number}</span>
         <h3>{area.title}</h3>
         <p>{area.description}</p>
-        <button
-          type="button"
-          className="focus-action"
-          aria-pressed={isEngaged}
-          aria-label={`${isEngaged ? "Ripristina" : "Ricomponi"} figura: ${area.title}`}
-          onClick={() => setIsEngaged((current) => !current)}
-        >
-          <span>{isEngaged ? "Ripristina figura" : "Ricomponi figura"}</span>
-          <span aria-hidden="true">{isEngaged ? "−" : "+"}</span>
-        </button>
       </div>
     </m.article>
   );
@@ -823,7 +1064,8 @@ function PrincipleRow({
 }) {
   const start = 0.1 + index * 0.17;
   const end = start + 0.3;
-  const fillScale = useTransform(progress, [start, end], [0, 1]);
+  const peak = start + (end - start) * 0.5;
+  const fillScale = useTransform(progress, [start, peak, end], [0, 1, 0]);
   const objectRotate = useTransform(
     progress,
     [start, end],
@@ -832,12 +1074,10 @@ function PrincipleRow({
   const objectScale = useTransform(progress, [start, end], [0.22, 1]);
 
   return (
-    <m.div
-      className="principle"
-    >
+    <m.div className="principle">
       <m.span
         className="principle-fill"
-        style={{ scaleX: shouldReduceMotion ? 1 : fillScale }}
+        style={{ scaleX: shouldReduceMotion ? 0 : fillScale }}
       />
       <span>0{index + 1}</span>
       <p>{principle}</p>
@@ -897,7 +1137,7 @@ function MagneticLink({ shouldReduceMotion }: { shouldReduceMotion: boolean }) {
       onPointerLeave={handlePointerLeave}
       style={shouldReduceMotion ? undefined : { x: smoothX, y: smoothY }}
     >
-      <span>Facciamola succedere</span>
+      <span>Parliamo del progetto</span>
       <span className="contact-link-arrow" aria-hidden="true">↗</span>
     </m.a>
   );
@@ -953,7 +1193,7 @@ export default function Home() {
   const navBackground = useTransform(
     smoothProgress,
     [0, 0.12],
-    ["rgba(17,16,15,0)", "rgba(17,16,15,0.88)"],
+    ["rgba(11,11,13,0)", "rgba(11,11,13,0.9)"],
   );
   const heroGridY = useTransform(heroProgress, [0, 1], [0, 90]);
   const heroLineOneX = useTransform(heroProgress, [0, 1], [0, -84]);
@@ -961,32 +1201,20 @@ export default function Home() {
   const heroCopyOpacity = useTransform(heroProgress, [0, 0.82, 1], [1, 1, 0.28]);
   const heroBottomY = useTransform(heroProgress, [0, 1], [0, -28]);
   const tapeX = useTransform(smoothProgress, [0.08, 0.32], ["0%", "-24%"]);
-  const aboutAmbientX = useTransform(aboutProgress, [0, 1], [-110, 120]);
-  const aboutTitleY = useTransform(aboutProgress, [0.12, 0.5], [70, 0]);
-  const aboutAccentX = useTransform(aboutProgress, [0.08, 0.62], [-55, 0]);
+  const aboutAmbientX = useTransform(aboutProgress, [0, 1], [-20, 24]);
+  const aboutTitleY = useTransform(aboutProgress, [0.12, 0.5], [32, 0]);
+  const aboutAccentX = useTransform(aboutProgress, [0.08, 0.62], [-20, 0]);
   const aboutDividerScale = useTransform(aboutProgress, [0.08, 0.48], [0, 1]);
-  const aboutParagraphOneY = useTransform(aboutProgress, [0.2, 0.52], [42, 0]);
-  const aboutParagraphTwoY = useTransform(aboutProgress, [0.28, 0.6], [42, 0]);
-  const aboutLineOneX = useTransform(aboutProgress, [0.05, 0.42, 1], [-90, 0, 42]);
-  const aboutSignalRotate = useTransform(aboutProgress, [0, 1], [-42, 168]);
+  const aboutParagraphOneY = useTransform(aboutProgress, [0.2, 0.52], [26, 0]);
+  const aboutParagraphTwoY = useTransform(aboutProgress, [0.28, 0.6], [30, 0]);
+  const aboutLineOneX = useTransform(aboutProgress, [0.05, 0.42, 1], [-24, 0, 12]);
+  const aboutSignalRotate = useTransform(aboutProgress, [0, 1], [-18, 62]);
   const aboutSignalScale = useTransform(
     aboutProgress,
     [0, 0.45, 1],
-    [0.58, 1, 1.2],
+    [0.86, 1, 1.05],
   );
-  const aboutRingOneRotate = useTransform(aboutProgress, [0, 1], [-60, 290]);
-  const aboutRingTwoRotate = useTransform(aboutProgress, [0, 1], [95, -250]);
-  const aboutCoreScale = useTransform(
-    aboutProgress,
-    [0, 0.42, 0.68, 1],
-    [0.35, 1.28, 0.82, 1.12],
-  );
-  const aboutGridRotate = useTransform(aboutProgress, [0, 1], [-6, 7]);
-  const aboutGridScale = useTransform(aboutProgress, [0, 0.55, 1], [0.9, 1.08, 1]);
-  const aboutPanelOneX = useTransform(aboutProgress, [0.18, 0.56], [-72, 0]);
-  const aboutPanelTwoX = useTransform(aboutProgress, [0.25, 0.63], [72, 0]);
-  const aboutPanelOneRotate = useTransform(aboutProgress, [0.18, 0.56], [-4.5, 0]);
-  const aboutPanelTwoRotate = useTransform(aboutProgress, [0.25, 0.63], [4.5, 0]);
+  const aboutRingOneRotate = useTransform(aboutProgress, [0, 1], [-32, 138]);
   const workHeadingX = useTransform(workProgress, [0.08, 0.45, 1], [80, 0, -55]);
   const principlesTitleY = useTransform(principlesProgress, [0.08, 0.42], [62, 0]);
   const principlesGridX = useTransform(principlesProgress, [0, 1], [-90, 90]);
@@ -1137,7 +1365,7 @@ export default function Home() {
               >
                 <p>
                   Questo è il mio spazio personale: un racconto in evoluzione tra
-                  tecnologia, creatività e cose costruite bene.
+                  tecnologia, progettazione e prodotti costruiti con metodo.
                 </p>
                 <a className="round-link" href="#about" aria-label="Scopri chi sono">
                   <span aria-hidden="true">↓</span>
@@ -1161,15 +1389,6 @@ export default function Home() {
 
           <section ref={aboutRef} id="about" className="about section-shell">
             <m.div
-              className="about-grid-plane"
-              aria-hidden="true"
-              style={
-                shouldReduceMotion
-                  ? undefined
-                  : { rotate: aboutGridRotate, scale: aboutGridScale }
-              }
-            />
-            <m.div
               className="about-signal"
               aria-hidden="true"
               style={
@@ -1184,24 +1403,8 @@ export default function Home() {
                   shouldReduceMotion ? undefined : { rotate: aboutRingOneRotate }
                 }
               />
-              <m.span
-                className="about-ring about-ring-two"
-                style={
-                  shouldReduceMotion ? undefined : { rotate: aboutRingTwoRotate }
-                }
-              />
-              <m.span
-                className="about-signal-core"
-                style={shouldReduceMotion ? undefined : { scale: aboutCoreScale }}
-              />
               <span className="about-signal-dot" />
-              <span className="about-signal-label">POSSIBILITY / 01</span>
             </m.div>
-            <div className="about-coordinates" aria-hidden="true">
-              <span>45°28′</span>
-              <span>IDEA → FORMA</span>
-              <span>∞ / 01</span>
-            </div>
             <m.div
               className="ambient-word"
               aria-hidden="true"
@@ -1241,9 +1444,7 @@ export default function Home() {
                     shouldReduceMotion
                       ? undefined
                       : {
-                          x: aboutPanelOneX,
                           y: aboutParagraphOneY,
-                          rotate: aboutPanelOneRotate,
                         }
                   }
                 >
@@ -1257,9 +1458,7 @@ export default function Home() {
                     shouldReduceMotion
                       ? undefined
                       : {
-                          x: aboutPanelTwoX,
                           y: aboutParagraphTwoY,
-                          rotate: aboutPanelTwoRotate,
                         }
                   }
                 >
@@ -1375,7 +1574,7 @@ export default function Home() {
             </div>
             <div className="footer-row">
               <p>© {new Date().getFullYear()} Nicolò Castellini</p>
-              <p>Fatto con curiosità e codice.</p>
+              <p>Design, software, automazione.</p>
             </div>
           </footer>
         </main>
