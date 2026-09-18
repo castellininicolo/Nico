@@ -1,7 +1,18 @@
 "use client";
 
-import { motion, useReducedMotion, useScroll, useSpring } from "framer-motion";
-import { useState, type PointerEvent } from "react";
+import {
+  LazyMotion,
+  MotionConfig,
+  m,
+  useMotionValue,
+  useReducedMotion,
+  useScroll,
+  useSpring,
+  useTransform,
+  useVelocity,
+  type MotionValue,
+} from "framer-motion";
+import { useRef, type PointerEvent as ReactPointerEvent } from "react";
 
 const focusAreas = [
   {
@@ -25,7 +36,7 @@ const focusAreas = [
       "Esploro nuovi modi di semplificare il lavoro e amplificare le idee.",
     shape: "automation",
   },
-];
+] as const;
 
 const principles = [
   "Curiosità prima delle certezze",
@@ -33,252 +44,634 @@ const principles = [
   "Persone prima degli strumenti",
 ];
 
-export default function Home() {
-  const shouldReduceMotion = useReducedMotion();
-  const { scrollYProgress } = useScroll();
-  const progress = useSpring(scrollYProgress, { stiffness: 120, damping: 24 });
-  const [pointer, setPointer] = useState({ x: 0, y: 0 });
+const journeyWaypoints = [
+  { position: 0, label: "Inizio" },
+  { position: 0.24, label: "Chi sono" },
+  { position: 0.49, label: "Cosa faccio" },
+  { position: 0.73, label: "Metodo" },
+  { position: 1, label: "Contatto" },
+];
 
-  const handlePointerMove = (event: PointerEvent<HTMLElement>) => {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    setPointer({
-      x: (event.clientX - bounds.left) / bounds.width - 0.5,
-      y: (event.clientY - bounds.top) / bounds.height - 0.5,
-    });
+const loadMotionFeatures = () =>
+  import("./motion-features").then((module) => module.default);
+
+type FocusArea = (typeof focusAreas)[number];
+
+function JourneyWaypoint({
+  progress,
+  position,
+  label,
+}: {
+  progress: MotionValue<number>;
+  position: number;
+  label: string;
+}) {
+  const opacity = useTransform(
+    progress,
+    [position - 0.08, position, position + 0.08],
+    [0.25, 1, 0.42],
+  );
+  const scale = useTransform(
+    progress,
+    [position - 0.035, position, position + 0.035],
+    [0.72, 1.35, 0.82],
+  );
+
+  return (
+    <m.div
+      className="journey-waypoint"
+      style={{ top: `${position * 100}%`, opacity }}
+    >
+      <span className="journey-label">{label}</span>
+      <m.span className="journey-node" style={{ scale }} />
+    </m.div>
+  );
+}
+
+function ScrollJourney({
+  progress,
+  velocity,
+  shouldReduceMotion,
+}: {
+  progress: MotionValue<number>;
+  velocity: MotionValue<number>;
+  shouldReduceMotion: boolean;
+}) {
+  const ballY = useTransform(progress, (value) => {
+    if (typeof window === "undefined") return 0;
+    const reservedSpace = window.innerWidth <= 680 ? 118 : 146;
+    return value * Math.max(0, window.innerHeight - reservedSpace);
+  });
+  const ballColor = useTransform(
+    progress,
+    [0, 0.24, 0.49, 0.73, 1],
+    ["#d8ff3e", "#ff664f", "#f2efe8", "#3157ff", "#11100f"],
+  );
+  const journeyOpacity = useTransform(progress, [0, 0.96, 1], [1, 1, 0]);
+  const targetStretch = useTransform(
+    velocity,
+    [-1800, 0, 1800],
+    [1.55, 1, 1.55],
+  );
+  const ballScaleY = useSpring(targetStretch, {
+    stiffness: 260,
+    damping: 28,
+  });
+  const ballScaleX = useTransform(ballScaleY, [1, 1.55], [1, 0.72]);
+
+  return (
+    <m.aside
+      className="scroll-journey"
+      aria-hidden="true"
+      style={{ opacity: shouldReduceMotion ? 0 : journeyOpacity }}
+    >
+      <span className="journey-rail" />
+      <m.span className="journey-fill" style={{ scaleY: progress }} />
+      {journeyWaypoints.map((waypoint) => (
+        <JourneyWaypoint
+          key={waypoint.label}
+          progress={progress}
+          position={waypoint.position}
+          label={waypoint.label}
+        />
+      ))}
+      <m.span
+        className="journey-ball"
+        style={{
+          y: ballY,
+          backgroundColor: ballColor,
+          scaleX: shouldReduceMotion ? 1 : ballScaleX,
+          scaleY: shouldReduceMotion ? 1 : ballScaleY,
+        }}
+      />
+    </m.aside>
+  );
+}
+
+function FocusCard({
+  area,
+  index,
+  progress,
+  shouldReduceMotion,
+}: {
+  area: FocusArea;
+  index: number;
+  progress: MotionValue<number>;
+  shouldReduceMotion: boolean;
+}) {
+  const cardBounds = useRef<DOMRect | null>(null);
+  const tiltX = useMotionValue(0);
+  const tiltY = useMotionValue(0);
+  const smoothTiltX = useSpring(tiltX, { stiffness: 260, damping: 24 });
+  const smoothTiltY = useSpring(tiltY, { stiffness: 260, damping: 24 });
+  const start = 0.04 + index * 0.11;
+  const end = start + 0.34;
+  const y = useTransform(progress, [start, end], [64, 0]);
+  const scale = useTransform(progress, [start, end], [0.94, 1]);
+  const rotateZ = useTransform(
+    progress,
+    [start, end],
+    [index === 1 ? 0 : index === 0 ? -1.8 : 1.8, 0],
+  );
+  const shapeRotate = useTransform(
+    progress,
+    [start, end],
+    [index === 1 ? -45 : 30 + index * 18, 0],
+  );
+  const shapeScale = useTransform(progress, [start, end], [0.72, 1]);
+
+  const handlePointerEnter = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.pointerType === "mouse") {
+      cardBounds.current = event.currentTarget.getBoundingClientRect();
+    }
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.pointerType !== "mouse" || shouldReduceMotion) return;
+    const bounds = cardBounds.current;
+    if (!bounds) return;
+
+    const normalizedX = (event.clientX - bounds.left) / bounds.width;
+    const normalizedY = (event.clientY - bounds.top) / bounds.height;
+    tiltY.set((normalizedX - 0.5) * 3.2);
+    tiltX.set((0.5 - normalizedY) * 3.2);
+    event.currentTarget.style.setProperty("--spot-x", `${normalizedX * 100}%`);
+    event.currentTarget.style.setProperty("--spot-y", `${normalizedY * 100}%`);
+  };
+
+  const handlePointerLeave = () => {
+    cardBounds.current = null;
+    tiltX.set(0);
+    tiltY.set(0);
   };
 
   return (
-    <main>
-      <motion.div className="scroll-progress" style={{ scaleX: progress }} />
-
-      <nav className="site-nav" aria-label="Navigazione principale">
-        <a className="monogram" href="#top" aria-label="Torna all’inizio">
-          NC
-        </a>
-        <div className="nav-links">
-          <a href="#about">Chi sono</a>
-          <a href="#work">Cosa faccio</a>
-          <a className="nav-cta" href="#contact">Parliamone</a>
-        </div>
-      </nav>
-
-      <section id="top" className="hero" onPointerMove={handlePointerMove}>
-        <div className="hero-grid" aria-hidden="true" />
-        <motion.div
-          className="hero-orbit hero-orbit-coral"
-          aria-hidden="true"
-          animate={
+    <m.article
+      className="focus-card"
+      onPointerEnter={handlePointerEnter}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
+      style={
+        shouldReduceMotion
+          ? undefined
+          : {
+              y,
+              scale,
+              rotateZ,
+              rotateX: smoothTiltX,
+              rotateY: smoothTiltY,
+            }
+      }
+    >
+      <div className={`shape shape-${area.shape}`} aria-hidden="true">
+        <m.div
+          style={
             shouldReduceMotion
               ? undefined
-              : {
-                  x: pointer.x * 42,
-                  y: pointer.y * 42,
-                  rotate: [0, 10, -7, 0],
-                  borderRadius: [
-                    "34% 66% 58% 42%",
-                    "62% 38% 29% 71%",
-                    "44% 56% 67% 33%",
-                    "34% 66% 58% 42%",
-                  ],
-                }
+              : { rotate: shapeRotate, scale: shapeScale }
           }
-          transition={{
-            x: { type: "spring", stiffness: 80 },
-            y: { type: "spring", stiffness: 80 },
-            duration: 12,
-            repeat: Infinity,
-          }}
         />
-        <motion.div
-          className="hero-orbit hero-orbit-blue"
-          aria-hidden="true"
-          animate={
-            shouldReduceMotion
-              ? undefined
-              : { x: pointer.x * -28, y: pointer.y * -28, rotate: 360 }
-          }
-          transition={{
-            x: { type: "spring", stiffness: 70 },
-            y: { type: "spring", stiffness: 70 },
-            rotate: { duration: 24, repeat: Infinity, ease: "linear" },
-          }}
-        />
+        <span className="shape-coordinate">0{index + 1} / 03</span>
+      </div>
+      <div className="focus-meta">
+        <span>{area.number}</span>
+        <h3>{area.title}</h3>
+        <p>{area.description}</p>
+      </div>
+    </m.article>
+  );
+}
 
-        <div className="hero-copy">
-          <motion.p
-            className="eyebrow"
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+function PrincipleRow({
+  principle,
+  index,
+  progress,
+  shouldReduceMotion,
+}: {
+  principle: string;
+  index: number;
+  progress: MotionValue<number>;
+  shouldReduceMotion: boolean;
+}) {
+  const start = 0.1 + index * 0.17;
+  const end = start + 0.3;
+  const fillScale = useTransform(progress, [start, end], [0, 1]);
+  const contentX = useTransform(
+    progress,
+    [start, end],
+    [index % 2 === 0 ? -20 : 20, 0],
+  );
+
+  return (
+    <m.div
+      className="principle"
+      style={shouldReduceMotion ? undefined : { x: contentX }}
+      tabIndex={0}
+    >
+      <m.span
+        className="principle-fill"
+        style={{ scaleX: shouldReduceMotion ? 1 : fillScale }}
+      />
+      <span>0{index + 1}</span>
+      <p>{principle}</p>
+      <span className="principle-arrow" aria-hidden="true">↗</span>
+    </m.div>
+  );
+}
+
+function MagneticLink({ shouldReduceMotion }: { shouldReduceMotion: boolean }) {
+  const linkBounds = useRef<DOMRect | null>(null);
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const smoothX = useSpring(x, { stiffness: 240, damping: 18 });
+  const smoothY = useSpring(y, { stiffness: 240, damping: 18 });
+
+  const handlePointerEnter = (event: ReactPointerEvent<HTMLAnchorElement>) => {
+    if (event.pointerType === "mouse") {
+      linkBounds.current = event.currentTarget.getBoundingClientRect();
+    }
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLAnchorElement>) => {
+    if (event.pointerType !== "mouse" || shouldReduceMotion) return;
+    const bounds = linkBounds.current;
+    if (!bounds) return;
+    x.set(((event.clientX - bounds.left) / bounds.width - 0.5) * 14);
+    y.set(((event.clientY - bounds.top) / bounds.height - 0.5) * 10);
+  };
+
+  const handlePointerLeave = () => {
+    linkBounds.current = null;
+    x.set(0);
+    y.set(0);
+  };
+
+  return (
+    <m.a
+      className="contact-link"
+      href="https://github.com/ex3meex"
+      target="_blank"
+      rel="noreferrer"
+      onPointerEnter={handlePointerEnter}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
+      style={shouldReduceMotion ? undefined : { x: smoothX, y: smoothY }}
+    >
+      <span>Facciamola succedere</span>
+      <span className="contact-link-arrow" aria-hidden="true">↗</span>
+    </m.a>
+  );
+}
+
+export default function Home() {
+  const shouldReduceMotion = Boolean(useReducedMotion());
+  const heroRef = useRef<HTMLElement>(null);
+  const aboutRef = useRef<HTMLElement>(null);
+  const workRef = useRef<HTMLElement>(null);
+  const principlesRef = useRef<HTMLElement>(null);
+  const contactRef = useRef<HTMLElement>(null);
+  const heroBounds = useRef<DOMRect | null>(null);
+  const pointerX = useMotionValue(0);
+  const pointerY = useMotionValue(0);
+  const smoothPointerX = useSpring(pointerX, { stiffness: 120, damping: 24 });
+  const smoothPointerY = useSpring(pointerY, { stiffness: 120, damping: 24 });
+
+  const { scrollY, scrollYProgress } = useScroll();
+  const smoothProgress = useSpring(scrollYProgress, {
+    stiffness: 115,
+    damping: 28,
+    mass: 0.25,
+  });
+  const scrollVelocity = useVelocity(scrollY);
+  const { scrollYProgress: heroProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"],
+  });
+  const { scrollYProgress: aboutProgress } = useScroll({
+    target: aboutRef,
+    offset: ["start end", "end start"],
+  });
+  const { scrollYProgress: workProgress } = useScroll({
+    target: workRef,
+    offset: ["start end", "end start"],
+  });
+  const { scrollYProgress: principlesProgress } = useScroll({
+    target: principlesRef,
+    offset: ["start end", "end start"],
+  });
+  const { scrollYProgress: contactProgress } = useScroll({
+    target: contactRef,
+    offset: ["start end", "end end"],
+  });
+
+  const navBackground = useTransform(
+    smoothProgress,
+    [0, 0.12],
+    ["rgba(17,16,15,0)", "rgba(17,16,15,0.88)"],
+  );
+  const coralX = useTransform(smoothPointerX, [-0.5, 0.5], [-28, 28]);
+  const coralY = useTransform(smoothPointerY, [-0.5, 0.5], [-24, 24]);
+  const blueX = useTransform(smoothPointerX, [-0.5, 0.5], [18, -18]);
+  const blueY = useTransform(smoothPointerY, [-0.5, 0.5], [16, -16]);
+  const coralRotate = useTransform(heroProgress, [0, 1], [0, 46]);
+  const coralScale = useTransform(heroProgress, [0, 1], [1, 0.68]);
+  const coralRadius = useTransform(
+    heroProgress,
+    [0, 0.55, 1],
+    ["34% 66% 58% 42%", "62% 38% 30% 70%", "50%"],
+  );
+  const blueRotate = useTransform(heroProgress, [0, 1], [0, 115]);
+  const blueScale = useTransform(heroProgress, [0, 1], [1, 0.62]);
+  const heroGridY = useTransform(heroProgress, [0, 1], [0, 90]);
+  const heroLineOneX = useTransform(heroProgress, [0, 1], [0, -84]);
+  const heroLineTwoX = useTransform(heroProgress, [0, 1], [0, 110]);
+  const heroCopyOpacity = useTransform(heroProgress, [0, 0.82, 1], [1, 1, 0.28]);
+  const heroBottomY = useTransform(heroProgress, [0, 1], [0, -28]);
+  const tapeX = useTransform(smoothProgress, [0.08, 0.32], ["0%", "-24%"]);
+  const aboutAmbientX = useTransform(aboutProgress, [0, 1], [-110, 120]);
+  const aboutTitleY = useTransform(aboutProgress, [0.12, 0.5], [70, 0]);
+  const aboutAccentX = useTransform(aboutProgress, [0.08, 0.62], [-55, 0]);
+  const aboutDividerScale = useTransform(aboutProgress, [0.08, 0.48], [0, 1]);
+  const aboutParagraphOneY = useTransform(aboutProgress, [0.2, 0.52], [42, 0]);
+  const aboutParagraphTwoY = useTransform(aboutProgress, [0.28, 0.6], [42, 0]);
+  const workHeadingX = useTransform(workProgress, [0.08, 0.45, 1], [80, 0, -55]);
+  const principlesTitleY = useTransform(principlesProgress, [0.08, 0.42], [62, 0]);
+  const contactTitleY = useTransform(contactProgress, [0.02, 0.58], [90, 0]);
+  const contactShapeScale = useTransform(contactProgress, [0, 1], [0.58, 1.12]);
+  const contactShapeRotate = useTransform(contactProgress, [0, 1], [-18, 4]);
+  const contactShapeRadius = useTransform(
+    contactProgress,
+    [0, 0.55, 1],
+    ["58% 42% 28% 72%", "31% 69% 62% 38%", "48% 52% 29% 71%"],
+  );
+
+  const handleHeroPointerEnter = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.pointerType === "mouse") {
+      heroBounds.current = event.currentTarget.getBoundingClientRect();
+    }
+  };
+
+  const handleHeroPointerMove = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.pointerType !== "mouse" || shouldReduceMotion) return;
+    const bounds = heroBounds.current;
+    if (!bounds) return;
+    pointerX.set((event.clientX - bounds.left) / bounds.width - 0.5);
+    pointerY.set((event.clientY - bounds.top) / bounds.height - 0.5);
+  };
+
+  const handleHeroPointerLeave = () => {
+    heroBounds.current = null;
+    pointerX.set(0);
+    pointerY.set(0);
+  };
+
+  return (
+    <LazyMotion features={loadMotionFeatures} strict>
+      <MotionConfig reducedMotion="user">
+        <main>
+          <m.div className="scroll-progress" style={{ scaleX: smoothProgress }} />
+          <ScrollJourney
+            progress={smoothProgress}
+            velocity={scrollVelocity}
+            shouldReduceMotion={shouldReduceMotion}
+          />
+
+          <m.nav
+            className="site-nav"
+            aria-label="Navigazione principale"
+            style={{ backgroundColor: navBackground }}
           >
-            Ciao, sono Nicolò <span aria-hidden="true">↘</span>
-          </motion.p>
-          <motion.h1
-            initial={{ opacity: 0, y: 35 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.08 }}
-          >
-            Idee complesse.
-            <br />
-            <span>Esperienze semplici.</span>
-          </motion.h1>
-          <motion.div
-            className="hero-bottom"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.7, delay: 0.35 }}
-          >
-            <p>
-              Questo è il mio spazio personale: un racconto in evoluzione tra
-              tecnologia, creatività e cose costruite bene.
-            </p>
-            <a className="round-link" href="#about" aria-label="Scopri chi sono">
-              <motion.span
-                aria-hidden="true"
-                animate={shouldReduceMotion ? undefined : { y: [0, 7, 0] }}
-                transition={{ duration: 1.8, repeat: Infinity }}
-              >
-                ↓
-              </motion.span>
+            <a className="monogram" href="#top" aria-label="Torna all’inizio">
+              <span>NC</span>
             </a>
-          </motion.div>
-        </div>
-      </section>
+            <div className="nav-links">
+              <a href="#about">Chi sono</a>
+              <a href="#work">Cosa faccio</a>
+              <a className="nav-cta" href="#contact">Parliamone</a>
+            </div>
+          </m.nav>
 
-      <section id="about" className="about section-shell">
-        <motion.p
-          className="section-label"
-          initial={{ opacity: 0, x: -20 }}
-          whileInView={{ opacity: 1, x: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-        >
-          01 / Chi sono
-        </motion.p>
-        <motion.div
-          className="about-copy"
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-          transition={{ duration: 0.7 }}
-        >
-          <h2>
-            Sono Nicolò Castellini.
-            <br />
-            <span>Mi piace dare forma alle possibilità.</span>
-          </h2>
-          <div className="about-details">
-            <p>
-              Mi muovo tra progettazione, sviluppo e sperimentazione. Cerco il
-              punto in cui un’idea smette di essere astratta e diventa qualcosa
-              che le persone possono davvero usare.
-            </p>
-            <p>
-              Credo nella tecnologia quando riduce la distanza tra un problema
-              e la sua soluzione. Il mio approccio unisce pensiero analitico,
-              attenzione visiva e una curiosità che non sta mai ferma.
-            </p>
+          <section
+            ref={heroRef}
+            id="top"
+            className="hero"
+            onPointerEnter={handleHeroPointerEnter}
+            onPointerMove={handleHeroPointerMove}
+            onPointerLeave={handleHeroPointerLeave}
+          >
+            <m.div
+              className="hero-grid"
+              aria-hidden="true"
+              style={shouldReduceMotion ? undefined : { y: heroGridY }}
+            />
+            <m.div
+              className="hero-orbit hero-orbit-coral"
+              aria-hidden="true"
+              style={
+                shouldReduceMotion
+                  ? undefined
+                  : {
+                      x: coralX,
+                      y: coralY,
+                      rotate: coralRotate,
+                      scale: coralScale,
+                      borderRadius: coralRadius,
+                    }
+              }
+            />
+            <m.div
+              className="hero-orbit hero-orbit-blue"
+              aria-hidden="true"
+              style={
+                shouldReduceMotion
+                  ? undefined
+                  : {
+                      x: blueX,
+                      y: blueY,
+                      rotate: blueRotate,
+                      scale: blueScale,
+                    }
+              }
+            />
+
+            <m.div
+              className="hero-copy"
+              style={shouldReduceMotion ? undefined : { opacity: heroCopyOpacity }}
+            >
+              <p className="eyebrow">
+                Ciao, sono Nicolò <span aria-hidden="true">↘</span>
+              </p>
+              <h1>
+                <m.span
+                  className="title-line"
+                  style={shouldReduceMotion ? undefined : { x: heroLineOneX }}
+                >
+                  Idee complesse.
+                </m.span>
+                <m.span
+                  className="title-line title-line-accent"
+                  style={shouldReduceMotion ? undefined : { x: heroLineTwoX }}
+                >
+                  Esperienze semplici.
+                </m.span>
+              </h1>
+              <m.div
+                className="hero-bottom"
+                style={shouldReduceMotion ? undefined : { y: heroBottomY }}
+              >
+                <p>
+                  Questo è il mio spazio personale: un racconto in evoluzione tra
+                  tecnologia, creatività e cose costruite bene.
+                </p>
+                <a className="round-link" href="#about" aria-label="Scopri chi sono">
+                  <span aria-hidden="true">↓</span>
+                </a>
+              </m.div>
+            </m.div>
+          </section>
+
+          <div className="kinetic-band" aria-hidden="true">
+            <m.div
+              className="kinetic-track"
+              style={shouldReduceMotion ? undefined : { x: tapeX }}
+            >
+              {Array.from({ length: 4 }, (_, index) => (
+                <span key={index}>
+                  DESIGN <i>×</i> CODICE <i>×</i> IDEE <i>×</i> FUTURO <i>×</i>
+                </span>
+              ))}
+            </m.div>
           </div>
-        </motion.div>
-      </section>
 
-      <section id="work" className="work section-shell">
-        <div className="section-heading">
-          <p className="section-label">02 / Cosa faccio</p>
-          <h2>Costruisco, collego, evolvo.</h2>
-        </div>
-        <div className="focus-list">
-          {focusAreas.map((area, index) => (
-            <motion.article
-              className="focus-card"
-              key={area.title}
-              initial={{ opacity: 0, y: 35 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-60px" }}
-              transition={{ duration: 0.55, delay: index * 0.08 }}
-              whileHover={shouldReduceMotion ? undefined : { y: -8 }}
+          <section ref={aboutRef} id="about" className="about section-shell">
+            <m.div
+              className="ambient-word"
+              aria-hidden="true"
+              style={shouldReduceMotion ? undefined : { x: aboutAmbientX }}
             >
-              <div className={`shape shape-${area.shape}`} aria-hidden="true">
-                <motion.div
-                  whileHover={
-                    shouldReduceMotion
-                      ? undefined
-                      : {
-                          rotate: area.shape === "software" ? 90 : -20,
-                          borderRadius:
-                            area.shape === "product"
-                              ? "50%"
-                              : "20% 80% 45% 55%",
-                          scale: 1.08,
-                        }
+              NICO
+            </m.div>
+            <p className="section-label">01 / Chi sono</p>
+            <m.div
+              className="about-copy"
+              style={shouldReduceMotion ? undefined : { y: aboutTitleY }}
+            >
+              <h2>
+                Sono Nicolò Castellini.
+                <br />
+                <m.span
+                  style={shouldReduceMotion ? undefined : { x: aboutAccentX }}
+                >
+                  Mi piace dare forma alle possibilità.
+                </m.span>
+              </h2>
+              <m.div
+                className="about-divider"
+                aria-hidden="true"
+                style={{ scaleX: shouldReduceMotion ? 1 : aboutDividerScale }}
+              />
+              <div className="about-details">
+                <m.p
+                  style={
+                    shouldReduceMotion ? undefined : { y: aboutParagraphOneY }
                   }
-                  transition={{ type: "spring", stiffness: 180, damping: 14 }}
+                >
+                  Mi muovo tra progettazione, sviluppo e sperimentazione. Cerco il
+                  punto in cui un’idea smette di essere astratta e diventa qualcosa
+                  che le persone possono davvero usare.
+                </m.p>
+                <m.p
+                  style={
+                    shouldReduceMotion ? undefined : { y: aboutParagraphTwoY }
+                  }
+                >
+                  Credo nella tecnologia quando riduce la distanza tra un problema
+                  e la sua soluzione. Il mio approccio unisce pensiero analitico,
+                  attenzione visiva e una curiosità che non sta mai ferma.
+                </m.p>
+              </div>
+            </m.div>
+          </section>
+
+          <section ref={workRef} id="work" className="work section-shell">
+            <div className="section-heading">
+              <p className="section-label">02 / Cosa faccio</p>
+              <m.h2
+                style={shouldReduceMotion ? undefined : { x: workHeadingX }}
+              >
+                Costruisco, collego, <em>evolvo.</em>
+              </m.h2>
+            </div>
+            <div className="focus-list">
+              {focusAreas.map((area, index) => (
+                <FocusCard
+                  area={area}
+                  index={index}
+                  key={area.title}
+                  progress={workProgress}
+                  shouldReduceMotion={shouldReduceMotion}
                 />
-              </div>
-              <div className="focus-meta">
-                <span>{area.number}</span>
-                <h3>{area.title}</h3>
-                <p>{area.description}</p>
-              </div>
-            </motion.article>
-          ))}
-        </div>
-      </section>
+              ))}
+            </div>
+          </section>
 
-      <section
-        className="principles section-shell"
-        aria-labelledby="principles-title"
-      >
-        <p className="section-label">03 / Il mio modo di lavorare</p>
-        <h2 id="principles-title">Poche regole. Molto intenzionali.</h2>
-        <div className="principles-list">
-          {principles.map((principle, index) => (
-            <motion.div
-              key={principle}
-              className="principle"
-              initial={{ opacity: 0, x: -24 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: index * 0.08 }}
+          <section
+            ref={principlesRef}
+            className="principles section-shell"
+            aria-labelledby="principles-title"
+          >
+            <p className="section-label">03 / Il mio modo di lavorare</p>
+            <m.h2
+              id="principles-title"
+              style={shouldReduceMotion ? undefined : { y: principlesTitleY }}
             >
-              <span>0{index + 1}</span>
-              <p>{principle}</p>
-              <span aria-hidden="true">↗</span>
-            </motion.div>
-          ))}
-        </div>
-      </section>
+              Poche regole.
+              <br />
+              <em>Molto intenzionali.</em>
+            </m.h2>
+            <div className="principles-list">
+              {principles.map((principle, index) => (
+                <PrincipleRow
+                  key={principle}
+                  principle={principle}
+                  index={index}
+                  progress={principlesProgress}
+                  shouldReduceMotion={shouldReduceMotion}
+                />
+              ))}
+            </div>
+          </section>
 
-      <footer id="contact" className="contact">
-        <motion.div
-          className="contact-shape"
-          aria-hidden="true"
-          animate={
-            shouldReduceMotion
-              ? undefined
-              : {
-                  borderRadius: [
-                    "48% 52% 29% 71%",
-                    "27% 73% 61% 39%",
-                    "62% 38% 46% 54%",
-                    "48% 52% 29% 71%",
-                  ],
-                  rotate: [0, 8, -5, 0],
-                }
-          }
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <div className="contact-content">
-          <p className="section-label">04 / Il prossimo passo</p>
-          <h2>Hai un’idea?</h2>
-          <a href="https://github.com/ex3meex" target="_blank" rel="noreferrer">
-            Facciamola succedere <span aria-hidden="true">↗</span>
-          </a>
-        </div>
-        <div className="footer-row">
-          <p>© {new Date().getFullYear()} Nicolò Castellini</p>
-          <p>Fatto con curiosità e codice.</p>
-        </div>
-      </footer>
-    </main>
+          <footer ref={contactRef} id="contact" className="contact">
+            <m.div
+              className="contact-shape"
+              aria-hidden="true"
+              style={
+                shouldReduceMotion
+                  ? undefined
+                  : {
+                      scale: contactShapeScale,
+                      rotate: contactShapeRotate,
+                      borderRadius: contactShapeRadius,
+                    }
+              }
+            />
+            <div className="contact-content">
+              <p className="section-label">04 / Il prossimo passo</p>
+              <m.h2
+                style={shouldReduceMotion ? undefined : { y: contactTitleY }}
+              >
+                Hai un’idea?
+              </m.h2>
+              <MagneticLink shouldReduceMotion={shouldReduceMotion} />
+            </div>
+            <div className="footer-row">
+              <p>© {new Date().getFullYear()} Nicolò Castellini</p>
+              <p>Fatto con curiosità e codice.</p>
+            </div>
+          </footer>
+        </main>
+      </MotionConfig>
+    </LazyMotion>
   );
 }
