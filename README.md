@@ -21,4 +21,4 @@ npm run build
 ## Deployment
 
 Pushes to `main` are built and deployed automatically to GitHub Pages at
-<https://ex3meex.github.io/Nico/>.
+<https://castellininicolo.github.io/Nico/>.

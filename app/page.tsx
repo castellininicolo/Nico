@@ -4,6 +4,7 @@ import {
   LazyMotion,
   MotionConfig,
   m,
+  useInView,
   useMotionValue,
   useReducedMotion,
   useScroll,
@@ -56,6 +57,226 @@ const loadMotionFeatures = () =>
   import("./motion-features").then((module) => module.default);
 
 type FocusArea = (typeof focusAreas)[number];
+
+function FocusVisual({
+  area,
+  index,
+  progress,
+  isActive,
+  shouldReduceMotion,
+}: {
+  area: FocusArea;
+  index: number;
+  progress: MotionValue<number>;
+  isActive: boolean;
+  shouldReduceMotion: boolean;
+}) {
+  const stageRotate = useTransform(
+    progress,
+    [0, 0.38, 0.72, 1],
+    [index === 1 ? -48 : -78, 12, -8, index === 2 ? 210 : 155],
+  );
+  const stageScale = useTransform(
+    progress,
+    [0, 0.38, 0.72, 1],
+    [0.58, 1.08, 0.94, 0.76],
+  );
+  const stageY = useTransform(progress, [0, 0.45, 1], [72, -8, -46]);
+  const orbitRotate = useTransform(progress, [0, 1], [-160, 390]);
+  const counterRotate = useTransform(progress, [0, 1], [90, -310]);
+  const orbitScale = useTransform(
+    progress,
+    [0, 0.42, 0.72, 1],
+    [0.5, 1.16, 0.88, 1.04],
+  );
+  const satelliteX = useTransform(progress, [0, 0.5, 1], [-52, 18, 46]);
+  const satelliteY = useTransform(progress, [0, 0.5, 1], [44, -28, 24]);
+  const panelSpread = useTransform(
+    progress,
+    [0, 0.42, 0.72, 1],
+    [1, 0.08, 0.32, 0.78],
+  );
+  const panelAX = useTransform(panelSpread, [0, 1], [0, -64]);
+  const panelAY = useTransform(panelSpread, [0, 1], [0, -42]);
+  const panelARotate = useTransform(panelSpread, [0, 1], [0, -24]);
+  const panelBX = useTransform(panelSpread, [0, 1], [0, 58]);
+  const panelBY = useTransform(panelSpread, [0, 1], [0, 38]);
+  const panelBRotate = useTransform(panelSpread, [0, 1], [0, 19]);
+  const networkScale = useTransform(
+    progress,
+    [0, 0.35, 0.72, 1],
+    [0.38, 1.14, 0.82, 1.05],
+  );
+  const networkRotate = useTransform(progress, [0, 1], [-120, 410]);
+  const nodeScale = useTransform(
+    progress,
+    [0, 0.28, 0.58, 0.82, 1],
+    [0.2, 1, 0.62, 1.18, 0.82],
+  );
+  const isMoving = isActive && !shouldReduceMotion;
+
+  return (
+    <div className={`shape shape-${area.shape}`} aria-hidden="true">
+      <m.div
+        className="shape-stage"
+        style={
+          shouldReduceMotion
+            ? undefined
+            : { rotate: stageRotate, scale: stageScale, y: stageY }
+        }
+      >
+        <m.div
+          className="shape-live"
+          animate={
+            isMoving
+              ? { y: [0, -9, 0], rotate: [0, index === 1 ? -2 : 3, 0] }
+              : { y: 0, rotate: 0 }
+          }
+          transition={{
+            duration: 5.8 + index * 0.8,
+            ease: "easeInOut",
+            repeat: isMoving ? Infinity : 0,
+          }}
+        >
+          {area.shape === "product" && (
+            <>
+              <m.span
+                className="product-orbit"
+                style={
+                  shouldReduceMotion
+                    ? undefined
+                    : { rotate: orbitRotate, scale: orbitScale }
+                }
+              >
+                <m.span
+                  className="product-orbit-live"
+                  animate={isMoving ? { rotate: [0, 360] } : { rotate: 0 }}
+                  transition={{
+                    duration: 8,
+                    ease: "linear",
+                    repeat: isMoving ? Infinity : 0,
+                  }}
+                >
+                  <span className="product-satellite product-satellite-a" />
+                  <span className="product-satellite product-satellite-b" />
+                </m.span>
+              </m.span>
+              <m.span
+                className="product-core"
+                style={
+                  shouldReduceMotion
+                    ? undefined
+                    : { rotate: counterRotate, scale: orbitScale }
+                }
+              />
+              <m.span
+                className="product-cardlet"
+                style={
+                  shouldReduceMotion
+                    ? undefined
+                    : { x: satelliteX, y: satelliteY, rotate: orbitRotate }
+                }
+              />
+            </>
+          )}
+
+          {area.shape === "software" && (
+            <>
+              <m.span
+                className="software-panel software-panel-a"
+                style={
+                  shouldReduceMotion
+                    ? undefined
+                    : { x: panelAX, y: panelAY, rotate: panelARotate }
+                }
+              />
+              <m.span
+                className="software-panel software-panel-b"
+                style={
+                  shouldReduceMotion
+                    ? undefined
+                    : { x: panelBX, y: panelBY, rotate: panelBRotate }
+                }
+              />
+              <m.span
+                className="software-panel software-panel-main"
+                style={
+                  shouldReduceMotion
+                    ? undefined
+                    : { rotate: counterRotate, scale: orbitScale }
+                }
+              >
+                <i />
+                <i />
+                <i />
+                <strong>&lt;/&gt;</strong>
+              </m.span>
+              <m.span
+                className="software-scanner"
+                animate={
+                  isMoving
+                    ? { x: ["-150%", "150%"], opacity: [0, 0.85, 0] }
+                    : { x: "-150%", opacity: 0 }
+                }
+                transition={{
+                  duration: 4.8,
+                  ease: "easeInOut",
+                  repeat: isMoving ? Infinity : 0,
+                }}
+              />
+            </>
+          )}
+
+          {area.shape === "automation" && (
+            <m.div
+              className="automation-system"
+              style={
+                shouldReduceMotion
+                  ? undefined
+                  : { rotate: networkRotate, scale: networkScale }
+              }
+            >
+              <m.div
+                className="automation-live"
+                animate={isMoving ? { rotate: [0, 360] } : { rotate: 0 }}
+                transition={{
+                  duration: 9,
+                  ease: "linear",
+                  repeat: isMoving ? Infinity : 0,
+                }}
+              >
+                <span className="automation-line automation-line-a" />
+                <span className="automation-line automation-line-b" />
+                <span className="automation-line automation-line-c" />
+                <m.span
+                  className="automation-node automation-node-a"
+                  style={shouldReduceMotion ? undefined : { scale: nodeScale }}
+                />
+                <m.span
+                  className="automation-node automation-node-b"
+                  style={shouldReduceMotion ? undefined : { scale: nodeScale }}
+                />
+                <m.span
+                  className="automation-node automation-node-c"
+                  style={shouldReduceMotion ? undefined : { scale: nodeScale }}
+                />
+              </m.div>
+              <m.span
+                className="automation-core"
+                style={
+                  shouldReduceMotion
+                    ? undefined
+                    : { rotate: counterRotate, scale: nodeScale }
+                }
+              />
+            </m.div>
+          )}
+        </m.div>
+      </m.div>
+      <span className="shape-coordinate">0{index + 1} / 03</span>
+    </div>
+  );
+}
 
 function JourneyWaypoint({
   progress,
@@ -151,34 +372,39 @@ function ScrollJourney({
 function FocusCard({
   area,
   index,
-  progress,
   shouldReduceMotion,
 }: {
   area: FocusArea;
   index: number;
-  progress: MotionValue<number>;
   shouldReduceMotion: boolean;
 }) {
+  const cardRef = useRef<HTMLElement>(null);
   const cardBounds = useRef<DOMRect | null>(null);
+  const isInView = useInView(cardRef, { margin: "-8% 0px -8% 0px" });
+  const { scrollYProgress: cardProgress } = useScroll({
+    target: cardRef,
+    offset: ["start end", "end start"],
+  });
+  const smoothCardProgress = useSpring(cardProgress, {
+    stiffness: 145,
+    damping: 28,
+    mass: 0.22,
+  });
   const tiltX = useMotionValue(0);
   const tiltY = useMotionValue(0);
   const smoothTiltX = useSpring(tiltX, { stiffness: 260, damping: 24 });
   const smoothTiltY = useSpring(tiltY, { stiffness: 260, damping: 24 });
-  const start = 0.04 + index * 0.11;
-  const end = start + 0.34;
-  const y = useTransform(progress, [start, end], [64, 0]);
-  const scale = useTransform(progress, [start, end], [0.94, 1]);
+  const y = useTransform(smoothCardProgress, [0, 0.22, 0.78, 1], [58, 0, 0, -28]);
+  const scale = useTransform(
+    smoothCardProgress,
+    [0, 0.25, 0.78, 1],
+    [0.94, 1, 1, 0.97],
+  );
   const rotateZ = useTransform(
-    progress,
-    [start, end],
-    [index === 1 ? 0 : index === 0 ? -1.8 : 1.8, 0],
+    smoothCardProgress,
+    [0, 0.24, 0.8, 1],
+    [index === 1 ? 1.2 : index === 0 ? -2.2 : 2.2, 0, 0, index - 1],
   );
-  const shapeRotate = useTransform(
-    progress,
-    [start, end],
-    [index === 1 ? -45 : 30 + index * 18, 0],
-  );
-  const shapeScale = useTransform(progress, [start, end], [0.72, 1]);
 
   const handlePointerEnter = (event: ReactPointerEvent<HTMLElement>) => {
     if (event.pointerType === "mouse") {
@@ -207,6 +433,7 @@ function FocusCard({
 
   return (
     <m.article
+      ref={cardRef}
       className="focus-card"
       onPointerEnter={handlePointerEnter}
       onPointerMove={handlePointerMove}
@@ -223,16 +450,13 @@ function FocusCard({
             }
       }
     >
-      <div className={`shape shape-${area.shape}`} aria-hidden="true">
-        <m.div
-          style={
-            shouldReduceMotion
-              ? undefined
-              : { rotate: shapeRotate, scale: shapeScale }
-          }
-        />
-        <span className="shape-coordinate">0{index + 1} / 03</span>
-      </div>
+      <FocusVisual
+        area={area}
+        index={index}
+        progress={smoothCardProgress}
+        isActive={isInView}
+        shouldReduceMotion={shouldReduceMotion}
+      />
       <div className="focus-meta">
         <span>{area.number}</span>
         <h3>{area.title}</h3>
@@ -261,11 +485,27 @@ function PrincipleRow({
     [start, end],
     [index % 2 === 0 ? -20 : 20, 0],
   );
+  const rowY = useTransform(progress, [start, end], [52, 0]);
+  const rowRotate = useTransform(
+    progress,
+    [start, end],
+    [index % 2 === 0 ? -2.2 : 2.2, 0],
+  );
+  const objectRotate = useTransform(
+    progress,
+    [start, end],
+    [-110 + index * 55, 0],
+  );
+  const objectScale = useTransform(progress, [start, end], [0.22, 1]);
 
   return (
     <m.div
       className="principle"
-      style={shouldReduceMotion ? undefined : { x: contentX }}
+      style={
+        shouldReduceMotion
+          ? undefined
+          : { x: contentX, y: rowY, rotateZ: rowRotate }
+      }
       tabIndex={0}
     >
       <m.span
@@ -274,6 +514,19 @@ function PrincipleRow({
       />
       <span>0{index + 1}</span>
       <p>{principle}</p>
+      <m.span
+        className={`principle-object principle-object-${index + 1}`}
+        aria-hidden="true"
+        style={
+          shouldReduceMotion
+            ? undefined
+            : { rotate: objectRotate, scale: objectScale }
+        }
+      >
+        <i />
+        <i />
+        <i />
+      </m.span>
       <span className="principle-arrow" aria-hidden="true">↗</span>
     </m.div>
   );
@@ -309,7 +562,7 @@ function MagneticLink({ shouldReduceMotion }: { shouldReduceMotion: boolean }) {
   return (
     <m.a
       className="contact-link"
-      href="https://github.com/ex3meex"
+      href="https://github.com/castellininicolo"
       target="_blank"
       rel="noreferrer"
       onPointerEnter={handlePointerEnter}
@@ -394,8 +647,56 @@ export default function Home() {
   const aboutDividerScale = useTransform(aboutProgress, [0.08, 0.48], [0, 1]);
   const aboutParagraphOneY = useTransform(aboutProgress, [0.2, 0.52], [42, 0]);
   const aboutParagraphTwoY = useTransform(aboutProgress, [0.28, 0.6], [42, 0]);
+  const aboutLineOneX = useTransform(aboutProgress, [0.05, 0.42, 1], [-90, 0, 42]);
+  const aboutSignalRotate = useTransform(aboutProgress, [0, 1], [-42, 168]);
+  const aboutSignalScale = useTransform(
+    aboutProgress,
+    [0, 0.45, 1],
+    [0.58, 1, 1.2],
+  );
+  const aboutRingOneRotate = useTransform(aboutProgress, [0, 1], [-60, 290]);
+  const aboutRingTwoRotate = useTransform(aboutProgress, [0, 1], [95, -250]);
+  const aboutCoreScale = useTransform(
+    aboutProgress,
+    [0, 0.42, 0.68, 1],
+    [0.35, 1.28, 0.82, 1.12],
+  );
+  const aboutScanY = useTransform(aboutProgress, [0.06, 0.94], [0, 720]);
+  const aboutScanOpacity = useTransform(
+    aboutProgress,
+    [0, 0.1, 0.88, 1],
+    [0, 0.9, 0.9, 0],
+  );
+  const aboutGridRotate = useTransform(aboutProgress, [0, 1], [-6, 7]);
+  const aboutGridScale = useTransform(aboutProgress, [0, 0.55, 1], [0.9, 1.08, 1]);
+  const aboutPanelOneX = useTransform(aboutProgress, [0.18, 0.56], [-72, 0]);
+  const aboutPanelTwoX = useTransform(aboutProgress, [0.25, 0.63], [72, 0]);
+  const aboutPanelOneRotate = useTransform(aboutProgress, [0.18, 0.56], [-4.5, 0]);
+  const aboutPanelTwoRotate = useTransform(aboutProgress, [0.25, 0.63], [4.5, 0]);
   const workHeadingX = useTransform(workProgress, [0.08, 0.45, 1], [80, 0, -55]);
   const principlesTitleY = useTransform(principlesProgress, [0.08, 0.42], [62, 0]);
+  const principlesGridX = useTransform(principlesProgress, [0, 1], [-90, 90]);
+  const principlesGridRotate = useTransform(principlesProgress, [0, 1], [-3, 3]);
+  const machineOuterRotate = useTransform(principlesProgress, [0, 1], [-80, 285]);
+  const machineInnerRotate = useTransform(principlesProgress, [0, 1], [90, -250]);
+  const machineNeedleRotate = useTransform(principlesProgress, [0, 1], [-105, 128]);
+  const machineCoreScale = useTransform(
+    principlesProgress,
+    [0, 0.3, 0.56, 0.82, 1],
+    [0.45, 1.3, 0.76, 1.38, 0.96],
+  );
+  const principlesCometX = useTransform(
+    principlesProgress,
+    [0, 0.34, 0.68, 1],
+    ["-12vw", "52vw", "14vw", "72vw"],
+  );
+  const principlesCometY = useTransform(
+    principlesProgress,
+    [0, 0.34, 0.68, 1],
+    [-40, 120, 360, 610],
+  );
+  const principlesCometRotate = useTransform(principlesProgress, [0, 1], [-45, 320]);
+  const principlesTapeX = useTransform(principlesProgress, [0, 1], ["-8%", "-34%"]);
   const contactTitleY = useTransform(contactProgress, [0.02, 0.58], [90, 0]);
   const contactShapeScale = useTransform(contactProgress, [0, 1], [0.58, 1.12]);
   const contactShapeRotate = useTransform(contactProgress, [0, 1], [-18, 4]);
@@ -545,6 +846,57 @@ export default function Home() {
 
           <section ref={aboutRef} id="about" className="about section-shell">
             <m.div
+              className="about-grid-plane"
+              aria-hidden="true"
+              style={
+                shouldReduceMotion
+                  ? undefined
+                  : { rotate: aboutGridRotate, scale: aboutGridScale }
+              }
+            />
+            <m.div
+              className="about-signal"
+              aria-hidden="true"
+              style={
+                shouldReduceMotion
+                  ? undefined
+                  : { rotate: aboutSignalRotate, scale: aboutSignalScale }
+              }
+            >
+              <m.span
+                className="about-ring about-ring-one"
+                style={
+                  shouldReduceMotion ? undefined : { rotate: aboutRingOneRotate }
+                }
+              />
+              <m.span
+                className="about-ring about-ring-two"
+                style={
+                  shouldReduceMotion ? undefined : { rotate: aboutRingTwoRotate }
+                }
+              />
+              <m.span
+                className="about-signal-core"
+                style={shouldReduceMotion ? undefined : { scale: aboutCoreScale }}
+              />
+              <span className="about-signal-dot" />
+              <span className="about-signal-label">POSSIBILITY / 01</span>
+            </m.div>
+            <m.div
+              className="about-scanline"
+              aria-hidden="true"
+              style={
+                shouldReduceMotion
+                  ? undefined
+                  : { y: aboutScanY, opacity: aboutScanOpacity }
+              }
+            />
+            <div className="about-coordinates" aria-hidden="true">
+              <span>45°28′</span>
+              <span>IDEA → FORMA</span>
+              <span>∞ / 01</span>
+            </div>
+            <m.div
               className="ambient-word"
               aria-hidden="true"
               style={shouldReduceMotion ? undefined : { x: aboutAmbientX }}
@@ -557,9 +909,15 @@ export default function Home() {
               style={shouldReduceMotion ? undefined : { y: aboutTitleY }}
             >
               <h2>
-                Sono Nicolò Castellini.
+                <m.span
+                  className="about-title-line"
+                  style={shouldReduceMotion ? undefined : { x: aboutLineOneX }}
+                >
+                  Sono Nicolò Castellini.
+                </m.span>
                 <br />
                 <m.span
+                  className="about-title-accent"
                   style={shouldReduceMotion ? undefined : { x: aboutAccentX }}
                 >
                   Mi piace dare forma alle possibilità.
@@ -572,8 +930,15 @@ export default function Home() {
               />
               <div className="about-details">
                 <m.p
+                  className="about-panel about-panel-one"
                   style={
-                    shouldReduceMotion ? undefined : { y: aboutParagraphOneY }
+                    shouldReduceMotion
+                      ? undefined
+                      : {
+                          x: aboutPanelOneX,
+                          y: aboutParagraphOneY,
+                          rotate: aboutPanelOneRotate,
+                        }
                   }
                 >
                   Mi muovo tra progettazione, sviluppo e sperimentazione. Cerco il
@@ -581,8 +946,15 @@ export default function Home() {
                   che le persone possono davvero usare.
                 </m.p>
                 <m.p
+                  className="about-panel about-panel-two"
                   style={
-                    shouldReduceMotion ? undefined : { y: aboutParagraphTwoY }
+                    shouldReduceMotion
+                      ? undefined
+                      : {
+                          x: aboutPanelTwoX,
+                          y: aboutParagraphTwoY,
+                          rotate: aboutPanelTwoRotate,
+                        }
                   }
                 >
                   Credo nella tecnologia quando riduce la distanza tra un problema
@@ -608,7 +980,6 @@ export default function Home() {
                   area={area}
                   index={index}
                   key={area.title}
-                  progress={workProgress}
                   shouldReduceMotion={shouldReduceMotion}
                 />
               ))}
@@ -620,15 +991,77 @@ export default function Home() {
             className="principles section-shell"
             aria-labelledby="principles-title"
           >
-            <p className="section-label">03 / Il mio modo di lavorare</p>
-            <m.h2
-              id="principles-title"
-              style={shouldReduceMotion ? undefined : { y: principlesTitleY }}
+            <m.div
+              className="principles-grid"
+              aria-hidden="true"
+              style={
+                shouldReduceMotion
+                  ? undefined
+                  : { x: principlesGridX, rotate: principlesGridRotate }
+              }
+            />
+            <m.div
+              className="principles-comet"
+              aria-hidden="true"
+              style={
+                shouldReduceMotion
+                  ? undefined
+                  : {
+                      x: principlesCometX,
+                      y: principlesCometY,
+                      rotate: principlesCometRotate,
+                    }
+              }
             >
-              Poche regole.
-              <br />
-              <em>Molto intenzionali.</em>
-            </m.h2>
+              <span />
+            </m.div>
+            <p className="section-label">03 / Il mio modo di lavorare</p>
+            <div className="principles-head">
+              <m.h2
+                id="principles-title"
+                style={shouldReduceMotion ? undefined : { y: principlesTitleY }}
+              >
+                Poche regole.
+                <br />
+                <em>Molto intenzionali.</em>
+              </m.h2>
+              <div className="principles-machine" aria-hidden="true">
+                <m.span
+                  className="machine-ring machine-ring-outer"
+                  style={
+                    shouldReduceMotion ? undefined : { rotate: machineOuterRotate }
+                  }
+                />
+                <m.span
+                  className="machine-ring machine-ring-inner"
+                  style={
+                    shouldReduceMotion ? undefined : { rotate: machineInnerRotate }
+                  }
+                />
+                <m.span
+                  className="machine-needle"
+                  style={
+                    shouldReduceMotion ? undefined : { rotate: machineNeedleRotate }
+                  }
+                />
+                <m.span
+                  className="machine-core"
+                  style={
+                    shouldReduceMotion ? undefined : { scale: machineCoreScale }
+                  }
+                />
+                <span className="machine-label">INTENT / 03</span>
+              </div>
+            </div>
+            <div className="principles-tape" aria-hidden="true">
+              <m.div
+                style={shouldReduceMotion ? undefined : { x: principlesTapeX }}
+              >
+                {Array.from({ length: 4 }, (_, index) => (
+                  <span key={index}>THINK · MAKE · TEST · REFINE · </span>
+                ))}
+              </m.div>
+            </div>
             <div className="principles-list">
               {principles.map((principle, index) => (
                 <PrincipleRow

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
-const siteUrl = "https://ex3meex.github.io/Nico";
+const siteUrl = "https://castellininicolo.github.io/Nico";
 const socialImage = `${siteUrl}/og.png`;
 
 export const metadata: Metadata = {
